@@ -1,199 +1,198 @@
-import { useState, useEffect } from 'react';
-import styles from '../styles/Home.module.css'; 
+import React, { useState, useEffect } from "react";
+import styles from "../styles/Home.module.css";
 
-export default function Home() {
-  const [tempEmail, setTempEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [inbox, setInbox] = useState([]);
-  const [messageBody, setMessageBody] = useState(null);
-  const [selectedMessage, setSelectedMessage] = useState(null);
-  const [expiryTime, setExpiryTime] = useState(null); // Waktu kedaluwarsa
+const Home = () => {
+    const [email, setEmail] = useState(null);
+    const [inbox, setInbox] = useState([]);
+    const [selectedMessage, setSelectedMessage] = useState(null);
+    const [timer, setTimer] = useState(300);
 
-  // Fungsi untuk menyimpan data email ke localStorage
-  const saveToLocalStorage = (email, expiry) => {
-    localStorage.setItem('tempEmail', email);
-    localStorage.setItem('expiryTime', expiry.toString());
-  };
+    // Load email and timer from localStorage on first render
+    useEffect(() => {
+        const savedEmail = localStorage.getItem("email");
+        const expiryTime = localStorage.getItem("expiryTime");
 
-  // Fungsi untuk memuat data email dari localStorage
-  const loadFromLocalStorage = () => {
-    const savedEmail = localStorage.getItem('tempEmail');
-    const savedExpiryTime = localStorage.getItem('expiryTime');
-    if (savedEmail && savedExpiryTime) {
-      const currentTime = Date.now();
-      if (currentTime < parseInt(savedExpiryTime, 10)) {
-        setTempEmail(savedEmail);
-        setExpiryTime(parseInt(savedExpiryTime, 10));
-      } else {
-        // Hapus email jika sudah kadaluarsa
-        localStorage.removeItem('tempEmail');
-        localStorage.removeItem('expiryTime');
-      }
-    }
-  };
-
-  // Fungsi untuk membuat email baru
-  const generateEmail = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/email');
-      const data = await res.json();
-
-      if (res.ok) {
-        setTempEmail(data.email);
-        setInbox([]);
-        setMessageBody(null); // Reset detail pesan
-        const expiry = Date.now() + 300000; // Waktu kadaluarsa 5 menit
-        setExpiryTime(expiry);
-        saveToLocalStorage(data.email, expiry); // Simpan ke localStorage
-      } else {
-        alert('Failed to generate email: ' + data.message);
-      }
-    } catch (error) {
-      alert('Error: ' + error.message);
-    }
-    setLoading(false);
-  };
-
-  const fetchInbox = async () => {
-    if (!tempEmail) return;
-    setLoading(true);
-    try {
-      const encodedEmail = encodeURIComponent(tempEmail);
-      const res = await fetch(`/api/inbox?email=${encodedEmail}`);
-      const data = await res.json();
-
-      if (res.ok) {
-        setInbox(data.items || []);
-      } else {
-        alert('Failed to fetch inbox: ' + data.message);
-      }
-    } catch (error) {
-      alert('Error fetching inbox: ' + error.message);
-    }
-    setLoading(false);
-  };
-
-  const fetchMessageBody = async (id) => {
-    setLoading(true);
-    try {
-      const encodedEmail = encodeURIComponent(tempEmail);
-      const res = await fetch(`/api/message?email=${encodedEmail}&id=${id}`);
-      const data = await res.json();
-
-      if (res.ok) {
-        setMessageBody(data.html); // Gunakan data HTML untuk menampilkan isi pesan
-      } else {
-        alert('Failed to fetch message body: ' + data.message);
-      }
-    } catch (error) {
-      alert('Error fetching message body: ' + error.message);
-    }
-    setLoading(false);
-  };
-
-  // Jalankan saat komponen pertama kali dimuat
-  useEffect(() => {
-    loadFromLocalStorage(); // Muat email dari localStorage saat halaman dimuat
-  }, []);
-
-  // Timer untuk mengecek waktu kadaluarsa secara periodik
-  useEffect(() => {
-    if (expiryTime) {
-      const interval = setInterval(() => {
-        if (Date.now() >= expiryTime) {
-          setTempEmail('');
-          setInbox([]);
-          setMessageBody(null);
-          localStorage.removeItem('tempEmail');
-          localStorage.removeItem('expiryTime');
-          clearInterval(interval);
+        if (savedEmail && expiryTime) {
+            const timeLeft = Math.floor((expiryTime - Date.now()) / 1000);
+            if (timeLeft > 0) {
+                setEmail(savedEmail);
+                setTimer(timeLeft);
+            } else {
+                localStorage.removeItem("email");
+                localStorage.removeItem("expiryTime");
+            }
         }
-      }, 1000);
+    }, []);
 
-      return () => clearInterval(interval);
-    }
-  }, [expiryTime]);
+    // Save email and expiry time to localStorage when email is generated
+    useEffect(() => {
+        if (email) {
+            const expiryTime = Date.now() + timer * 1000;
+            localStorage.setItem("email", email);
+            localStorage.setItem("expiryTime", expiryTime);
+        }
+    }, [email, timer]);
 
-  useEffect(() => {
-    if (tempEmail) {
-      const interval = setInterval(fetchInbox, 15000); // Refresh inbox setiap 15 detik
-      return () => clearInterval(interval);
-    }
-  }, [tempEmail]);
+    // Generate email
+    const generateEmail = async () => {
+        try {
+            const response = await fetch("https://api.paxsenix.biz.id/tempmail/create", {
+                method: "GET",
+                headers: {
+                    Accept: "application/json",
+                },
+            });
 
-  return (
-    <div className={styles.container}>
-      <h1>Temporary Email Generator</h1>
-      <button
-        onClick={generateEmail}
-        className={styles.button}
-        disabled={loading}
-      >
-        {loading ? 'Generating...' : 'Generate Email'}
-      </button>
+            if (response.headers.get("content-type")?.includes("application/json")) {
+                const data = await response.json();
+                if (data.ok) {
+                    setEmail(data.email);
+                    setInbox([]);
+                    setTimer(300); // Reset timer
+                    localStorage.removeItem("email"); // Clear saved email
+                    localStorage.removeItem("expiryTime");
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } else {
+                throw new Error("Response is not JSON");
+            }
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    };
 
-      {tempEmail && (
-        <div>
-          <p className={styles.emailText}>
-            Your Temporary Email: <span className={styles.email}>{tempEmail}</span>
-          </p>
-          <p className={styles.timerText}>
-            This email will expire in{' '}
-            {Math.max(0, Math.ceil((expiryTime - Date.now()) / 1000))} seconds.
-          </p>
-          <button onClick={fetchInbox} className={styles.button}>
-            Refresh Inbox
-          </button>
-          <ul className={styles.inboxList}>
-            {inbox.length > 0 ? (
-              inbox.map((item) => (
-                <li key={item.id} className={styles.inboxItem}>
-                  <strong>From:</strong> {item.from} <br />
-                  <strong>Subject:</strong> {item.subject} <br />
-                  <strong>Time:</strong> {item.time} <br />
-                  <button
-                    onClick={() => {
-                      setSelectedMessage(item);
-                      fetchMessageBody(item.id);
-                    }}
-                    className={styles.viewButton}
-                  >
-                    View Message
-                  </button>
-                </li>
-              ))
+    // Fetch inbox
+    const fetchInbox = async () => {
+        if (!email) return;
+
+        try {
+            const response = await fetch(
+                `https://api.paxsenix.biz.id/tempmail/inbox?email=${encodeURIComponent(email)}`,
+                {
+                    method: "GET",
+                    headers: {
+                        Accept: "application/json",
+                    },
+                }
+            );
+
+            if (response.headers.get("content-type")?.includes("application/json")) {
+                const data = await response.json();
+                if (data.ok) {
+                    setInbox(data.items || []);
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } else {
+                throw new Error("Response is not JSON");
+            }
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    };
+
+    // View message details
+    const viewMessage = async (id) => {
+        try {
+            const response = await fetch(
+                `https://api.paxsenix.biz.id/tempmail/body?email=${encodeURIComponent(email)}&id=${id}`,
+                {
+                    method: "GET",
+                    headers: {
+                        Accept: "application/json",
+                    },
+                }
+            );
+
+            if (response.headers.get("content-type")?.includes("application/json")) {
+                const data = await response.json();
+                if (data.ok) {
+                    setSelectedMessage(data);
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            } else {
+                throw new Error("Response is not JSON");
+            }
+        } catch (error) {
+            alert(`Error: ${error.message}`);
+        }
+    };
+
+    // Countdown timer
+    useEffect(() => {
+        if (timer > 0) {
+            const interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
+            return () => clearInterval(interval);
+        } else {
+            setEmail(null);
+            localStorage.removeItem("email");
+            localStorage.removeItem("expiryTime");
+        }
+    }, [timer]);
+
+    // Auto-fetch inbox every 10 seconds
+    useEffect(() => {
+        if (email) {
+            const interval = setInterval(fetchInbox, 10000);
+            return () => clearInterval(interval);
+        }
+    }, [email]);
+
+    return (
+        <div className={styles.container}>
+            <h1>Temporary Email Generator</h1>
+            {!email ? (
+                <button onClick={generateEmail} className={styles.button}>
+                    Generate Email
+                </button>
             ) : (
-              <p>No messages yet.</p>
+                <>
+                    <p className={styles.emailText}>
+                        Your Temporary Email: <span className={styles.email}>{email}</span>
+                    </p>
+                    <p className={styles.timerText}>
+                        Expires in: {Math.floor(timer / 60)}:{timer % 60 < 10 ? `0${timer % 60}` : timer % 60}
+                    </p>
+                    <button onClick={generateEmail} className={styles.button}>
+                        Generate New Email
+                    </button>
+                    <h2>Inbox</h2>
+                    <ul className={styles.inboxList}>
+                        {inbox.map((item) => (
+                            <li key={item.id} className={styles.inboxItem}>
+                                <p>
+                                    <strong>Subject:</strong> {item.subject}
+                                </p>
+                                <p>
+                                    <strong>From:</strong> {item.from}
+                                </p>
+                                <p>
+                                    <strong>Time:</strong> {item.time}
+                                </p>
+                                <button onClick={() => viewMessage(item.id)} className={styles.viewButton}>
+                                    View Message
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </>
             )}
-          </ul>
-
-          {selectedMessage && messageBody && (
-            <div className={styles.messageDetail}>
-              <h2>Message Details</h2>
-              <p>
-                <strong>From:</strong> {selectedMessage.from}
-              </p>
-              <p>
-                <strong>Subject:</strong> {selectedMessage.subject}
-              </p>
-              <div
-                className={styles.messageContent}
-                dangerouslySetInnerHTML={{ __html: messageBody }}
-              ></div>
-              <button
-                onClick={() => {
-                  setSelectedMessage(null);
-                  setMessageBody(null);
-                }}
-                className={styles.closeButton}
-              >
-                Close
-              </button>
-            </div>
-          )}
+            {selectedMessage && (
+                <div className={styles.messageDetail}>
+                    <h3>Message Details</h3>
+                    <div
+                        className={styles.messageContent}
+                        dangerouslySetInnerHTML={{ __html: selectedMessage.html }}
+                    ></div>
+                    <button onClick={() => setSelectedMessage(null)} className={styles.closeButton}>
+                        Close
+                    </button>
+                </div>
+            )}
         </div>
-      )}
-    </div>
-  );
-}
+    );
+};
+
+export default Home;
