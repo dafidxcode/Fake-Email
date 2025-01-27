@@ -191,6 +191,11 @@ const Home = () => {
                     </button>
                 </div>
             )}
+            <footer className={styles.footer}>
+            <p>
+                Author by <a href="https://github.com/dafidxcode" target="_blank" rel="noopener noreferrer" className={styles.authorLink}>DieckyAwsm</a>
+            </p>
+        </footer>
         </div>
     );
 };
