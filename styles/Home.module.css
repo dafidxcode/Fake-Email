@@ -91,3 +91,35 @@
 .closeButton:hover {
     background-color: darkred;
 }
+
+.footer {
+    margin-top: 50px;
+    text-align: center;
+    font-size: 14px;
+    color: #666;
+}
+
+.authorLink {
+    color: #0070f3;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.authorLink:hover {
+    text-decoration: underline;
+}.footer {
+    margin-top: 50px;
+    text-align: center;
+    font-size: 14px;
+    color: #666;
+}
+
+.authorLink {
+    color: #0070f3;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.authorLink:hover {
+    text-decoration: none;
+}
